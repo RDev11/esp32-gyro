@@ -1,0 +1,49 @@
+menu "Example Configuration"
+
+    config BLINK_GPIO
+        int "Blink GPIO number"
+        range 0 48
+        default 8 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32H2
+        default 18 if IDF_TARGET_ESP32S2
+        default 48 if IDF_TARGET_ESP32S3
+        default 5
+        help
+            GPIO number (IOxx) to blink on and off or the RMT signal for the addressable LED.
+            Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used to blink.
+
+    config BUTTON_GPIO
+        int "Button GPIO number"
+        range 0 48
+        default 4
+        help
+            GPIO number Button.
+
+    config PIN_NUM_MOSI
+        int "MOSI pin"
+        range 0 48
+        default 23
+        help
+            MOSI (SDI) pin.
+
+    config PIN_NUM_MISO
+        int "MISO pin"
+        range 0 48
+        default 19
+        help
+            MISO (SDO) pin.
+
+    config PIN_NUM_CLK
+        int "CLK pin"
+        range 0 48
+        default 18
+        help
+            SCLK: SCK, CLK, SPC (SPI serial port clock) pin.
+
+    config PIN_NUM_CS
+        int "CS pin"
+        range 0 48
+        default 5
+        help
+            CS (SS) pin.
+
+endmenu
