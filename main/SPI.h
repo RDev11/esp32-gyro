@@ -107,6 +107,10 @@ namespace spi
     public:
         Gyro(spi_host_device_t host, gpio_num_t cs_pin);
         void testGyro(ili9341* dev);
+    public:
+        int16_t ax, ay, az;
+        int16_t rx, ry, rz;
+        int16_t temp;
     };
 
 

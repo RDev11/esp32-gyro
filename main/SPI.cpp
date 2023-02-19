@@ -468,45 +468,53 @@ namespace spi{ //spi::ili9341
             //double asd =  ((int16_t)swapbytes(data[0]))/32768.0;
             //snprintf(strbuf, 1023, "%1.5lf ", asd);
             //ESP_LOGI(__FUNCTION__,  strbuf);
+            
+            ax = swapbytes(data[0]);
+            ay = swapbytes(data[1]);
+            az = swapbytes(data[2]);
+            temp = swapbytes(data[3]);
+            rx = swapbytes(data[4]);
+            ry = swapbytes(data[5]);
+            rz = swapbytes(data[6]);
 
-            std::string ax = float_to_str(((int16_t)swapbytes(data[0])/32768.0f), 2, 4);
-            std::string ay = float_to_str(((int16_t)swapbytes(data[1])/32768.0f), 2, 4);
-            std::string az = float_to_str(((int16_t)swapbytes(data[2])/32768.0f), 2, 4);
-            std::string t  = float_to_str(((int16_t)swapbytes(data[3])/32768.0f), 2, 4);
-            std::string gx = float_to_str(((int16_t)swapbytes(data[4])/32768.0f), 2, 4);
-            std::string gy = float_to_str(((int16_t)swapbytes(data[5])/32768.0f), 2, 4);
-            std::string gz = float_to_str(((int16_t)swapbytes(data[6])/32768.0f), 2, 4);
+            std::string sax = float_to_str((ax/32768.0f), 2, 4);
+            std::string say = float_to_str((ay/32768.0f), 2, 4);
+            std::string saz = float_to_str((az/32768.0f), 2, 4);
+            std::string stemp  = "t:"+float_to_str((temp/ 333.87f + 21.0f), 2, 2);//16.5 ~=36.6?; 6 ~= 22/// ???
+            std::string srx = float_to_str((rx/32768.0f), 2, 4);
+            std::string sry = float_to_str((ry/32768.0f), 2, 4);
+            std::string srz = float_to_str((rz/32768.0f), 2, 4);
 
             ili9341_text_attr_t attr{};
             attr.font = &ili9341_font_16x26;
             attr.fg_color = RGB(255,0,0);
-            ili9341_draw_string(dev, attr, ax);
+            ili9341_draw_string(dev, attr, sax);
 
             attr.fg_color = RGB(0,255,0);
             attr.origin_y += attr.font->height;
-            ili9341_draw_string(dev, attr, ay);
+            ili9341_draw_string(dev, attr, say);
 
             attr.fg_color = RGB(0,0,255);
             attr.origin_y += attr.font->height;
-            ili9341_draw_string(dev, attr, az);
+            ili9341_draw_string(dev, attr, saz);
 
             attr.fg_color = RGB(255,0,0);
             attr.origin_y += attr.font->height;
-            ili9341_draw_string(dev, attr, gx);
+            ili9341_draw_string(dev, attr, srx);
 
             attr.fg_color = RGB(0,255,0);
             attr.origin_y += attr.font->height;
-            ili9341_draw_string(dev, attr, gy);
+            ili9341_draw_string(dev, attr, sry);
 
             attr.fg_color = RGB(0,0,255);
             attr.origin_y += attr.font->height;
-            ili9341_draw_string(dev, attr, gz);
+            ili9341_draw_string(dev, attr, srz);
 
             attr.fg_color = RGB(255,255,255);
             attr.origin_y += attr.font->height;
-            ili9341_draw_string(dev, attr, t);
+            ili9341_draw_string(dev, attr, stemp);
             
-            usleep(250*1000);
+            usleep(150*1000);
         }
 
 
