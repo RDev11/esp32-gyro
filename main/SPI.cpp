@@ -514,7 +514,8 @@ namespace spi{ //spi::ili9341
             attr.origin_y += attr.font->height;
             ili9341_draw_string(dev, attr, stemp);
             
-            usleep(150*1000);
+            //usleep(150*1000);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
 
 

@@ -13,21 +13,19 @@
 //#include "img_doom_v.h"
 uint16_t img_doom[]={0};
 //
-void bt_test();
+extern void bt_test();
 
 uint16_t color=0;
 using namespace spi;
-using mydevice_t = spi::device;
-
 
 
 class MyMotor {
 public:
 	MyMotor() {
-		dir_gpio = (gpio_num_t)33;
+		dir_gpio = GPIO_NUM_32;
 		step_gpio = (gpio_num_t)32;
 		_step = 0;
-		dir = 0;
+		dir = 1;
 	}
 	void init() {
 		
@@ -48,11 +46,12 @@ public:
 public:
 	gpio_num_t dir_gpio;
 	gpio_num_t step_gpio;
-	int _step;
+volatile	int _step;
 	int dir;
 };
 MyMotor myMotor;
 spi::Gyro dev2(HSPI_HOST, (gpio_num_t)26);
+#if 0
 bool IRAM_ATTR onTimer(void* args){
 	//digitalWrite(LED, !digitalRead(LED));
 	
@@ -61,21 +60,72 @@ bool IRAM_ATTR onTimer(void* args){
 	myMotor.setDir(dev2.ax>0?1:0);
 	if (dev2.ax!=0){
 		delay = delay/std::abs(dev2.ax);
-	} else {
-	}
+	} 
 	if(delay>20000) {
 		delay = 20000;
 	} else {
 		myMotor.step();
 	}
-	delay = std::max(std::abs(delay), 10);
+	delay = std::max((int)std::abs(delay), 10);
 	//delay = 100;
  	//ESP_DRAM_LOGI(__FUNCTION__, "ON TIMER %d", delay);
 	//timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
 	timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, delay);
 	return false;
 }
+#else
 
+gptimer_alarm_config_t alarm_config = {
+    .alarm_count = 1000000, // period = 1s @resolution 1MHz
+  //  .reload_count = 0, // counter will reload with 0 on alarm event
+  //  .flags = {.auto_reload_on_alarm=true}, // enable auto-reload
+};
+
+
+typedef struct {
+    uint64_t event_count;
+} example_queue_element_t;
+
+static bool example_timer_on_alarm_cb(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx)
+{
+    BaseType_t high_task_awoken = pdFALSE;
+	/*	QueueHandle_t queue = (QueueHandle_t)user_ctx;
+		// Retrieve the count value from event data
+		example_queue_element_t ele = {
+			.event_count = edata->count_value
+		};
+	
+		// Optional: send the event data to other task by OS queue
+		// Do not introduce complex logics in callbacks
+		// Suggest dealing with event data in the main loop, instead of in this callback
+    	xQueueSendFromISR(queue, &ele, &high_task_awoken);
+	*/
+	//high_task_awoken = pdTRUE;
+	uint32_t delay = 65536*50 ;
+	myMotor.setDir(dev2.ax>0?1:0);
+	if (dev2.ax!=0){
+		delay = delay/std::abs(dev2.ax);
+	} 
+	if(delay>20000) {
+		delay = 20000;
+		myMotor.step();
+	} else {
+		myMotor.step();
+	}
+	delay = std::max(delay, (uint32_t)10);
+	//ESP_DRAM_LOGI(__FUNCTION__, "ON TIMER %d %d", delay, edata->alarm_value);
+    gptimer_alarm_config_t alarm_config = {
+        .alarm_count = edata->alarm_value + delay, 
+    };
+    gptimer_set_alarm_action(timer, &alarm_config);
+    // return whether we need to yield at the end of ISR
+    return high_task_awoken == pdTRUE;
+}
+
+
+
+
+#endif
 
 
 void DrawDoomImg(ili9341* dev, uint8_t* img_doom, size_t size)
@@ -119,6 +169,7 @@ void app_main_cpp(void)
 	}
 	
 
+#if 0 //timer_group: legacy driver is deprecated, please migrate to `driver/gptimer.h`
 	timer_group_t group_num;
 	timer_idx_t timer_num;
 	timer_config_t config{};
@@ -131,14 +182,33 @@ void app_main_cpp(void)
 	esp_err_t err = timer_init(TIMER_GROUP_0, TIMER_0, &config);
 
 	timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
-	timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, 3e4);
+	timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, 30'000);
 
 	timer_isr_callback_add(TIMER_GROUP_0, TIMER_0, onTimer, nullptr, 0);
 	timer_enable_intr(TIMER_GROUP_0, TIMER_0);
 
 	myMotor.init();
 	timer_start(TIMER_GROUP_0, TIMER_0);
+#else
+	gptimer_handle_t gptimer = NULL;
+	gptimer_config_t timer_config = {
+		.clk_src = GPTIMER_CLK_SRC_DEFAULT,
+		.direction = GPTIMER_COUNT_UP,
+		.resolution_hz = 1 * 1000 * 1000, // 1MHz, 1 tick = 1us
+	};
+	ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &gptimer));
 
+	ESP_ERROR_CHECK(gptimer_set_alarm_action(gptimer, &alarm_config));
+
+	gptimer_event_callbacks_t cbs = {
+		.on_alarm = example_timer_on_alarm_cb, // register user callback
+	};
+	ESP_ERROR_CHECK(gptimer_register_event_callbacks(gptimer, &cbs, nullptr));
+	myMotor.init();
+	ESP_ERROR_CHECK(gptimer_enable(gptimer));
+	ESP_ERROR_CHECK(gptimer_start(gptimer));
+#endif
+	ESP_LOGI(TAG, "after timers");
 	//ESP_LOGI(TAG, "test float=%2.4f", 0.4);
 	/*esp_err_t ret=ESP_OK;
 	spi_bus_config_t cfg={
@@ -167,7 +237,8 @@ void app_main_cpp(void)
 		//dev2.spi_cfg.address_bits =
 		spi_bus_add_device(HSPI_HOST, &dev2.m_spi_cfg, &dev2.m_spi_dev);
 	}
-
+	
+	ESP_LOGI(TAG, "after init display");
 
 	swapbytes((uint8_t*)img_doom, sizeof(img_doom));
 	vTaskDelay(1);
@@ -180,6 +251,9 @@ void app_main_cpp(void)
 	vTaskDelay(1);
 	dev.ClearScreen();
 	vTaskDelay(1);
+	//bt_test();
+	//for(;;)
+	//	vTaskDelay(1);
 	dev2.testGyro(&dev);
 	color=random();
   while (1) {
