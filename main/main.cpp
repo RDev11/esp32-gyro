@@ -13,7 +13,7 @@
 //#include "img_doom_v.h"
 uint16_t img_doom[]={0};
 //
-extern void bt_test();
+#include "bluetooth/bluetooth_serial.h"
 
 uint16_t color=0;
 using namespace spi;
@@ -46,34 +46,12 @@ public:
 public:
 	gpio_num_t dir_gpio;
 	gpio_num_t step_gpio;
-volatile	int _step;
+	int _step;
 	int dir;
 };
 MyMotor myMotor;
 spi::Gyro dev2(HSPI_HOST, (gpio_num_t)26);
-#if 0
-bool IRAM_ATTR onTimer(void* args){
-	//digitalWrite(LED, !digitalRead(LED));
-	
-	
-	int32_t delay = 65536*50 ;
-	myMotor.setDir(dev2.ax>0?1:0);
-	if (dev2.ax!=0){
-		delay = delay/std::abs(dev2.ax);
-	} 
-	if(delay>20000) {
-		delay = 20000;
-	} else {
-		myMotor.step();
-	}
-	delay = std::max((int)std::abs(delay), 10);
-	//delay = 100;
- 	//ESP_DRAM_LOGI(__FUNCTION__, "ON TIMER %d", delay);
-	//timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
-	timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, delay);
-	return false;
-}
-#else
+
 
 gptimer_alarm_config_t alarm_config = {
     .alarm_count = 1000000, // period = 1s @resolution 1MHz
@@ -125,9 +103,6 @@ static bool example_timer_on_alarm_cb(gptimer_handle_t timer, const gptimer_alar
 
 
 
-#endif
-
-
 void DrawDoomImg(ili9341* dev, uint8_t* img_doom, size_t size)
 {
     ESP_LOGI(__FUNCTION__, "IN");
@@ -169,27 +144,6 @@ void app_main_cpp(void)
 	}
 	
 
-#if 0 //timer_group: legacy driver is deprecated, please migrate to `driver/gptimer.h`
-	timer_group_t group_num;
-	timer_idx_t timer_num;
-	timer_config_t config{};
-		config.divider = 80; // 80MHz / 80 = 1MHz
-		config.counter_dir = TIMER_COUNT_UP;
-		config.counter_en = TIMER_PAUSE; // pause after init
-		config.alarm_en = TIMER_ALARM_EN; //interrupt enable
-		config.auto_reload = TIMER_AUTORELOAD_EN;// TIMER_AUTORELOAD_EN; //loop 
-
-	esp_err_t err = timer_init(TIMER_GROUP_0, TIMER_0, &config);
-
-	timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
-	timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, 30'000);
-
-	timer_isr_callback_add(TIMER_GROUP_0, TIMER_0, onTimer, nullptr, 0);
-	timer_enable_intr(TIMER_GROUP_0, TIMER_0);
-
-	myMotor.init();
-	timer_start(TIMER_GROUP_0, TIMER_0);
-#else
 	gptimer_handle_t gptimer = NULL;
 	gptimer_config_t timer_config = {
 		.clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -207,7 +161,7 @@ void app_main_cpp(void)
 	myMotor.init();
 	ESP_ERROR_CHECK(gptimer_enable(gptimer));
 	ESP_ERROR_CHECK(gptimer_start(gptimer));
-#endif
+
 	ESP_LOGI(TAG, "after timers");
 	//ESP_LOGI(TAG, "test float=%2.4f", 0.4);
 	/*esp_err_t ret=ESP_OK;
@@ -252,8 +206,8 @@ void app_main_cpp(void)
 	dev.ClearScreen();
 	vTaskDelay(1);
 	//bt_test();
-	//for(;;)
-	//	vTaskDelay(1);
+	bluetooth::bluetooth_start_accept();
+	
 	dev2.testGyro(&dev);
 	color=random();
   while (1) {

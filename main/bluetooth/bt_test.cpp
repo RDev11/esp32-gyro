@@ -22,6 +22,7 @@
 
 #include "time.h"
 #include "sys/time.h"
+#include "bluetooth/bluetooth_serial.h"
 
 #define SPP_TAG "SPP_ACCEPTOR_DEMO"
 #define SPP_SERVER_NAME "SPP_SERVER"
@@ -66,7 +67,7 @@ static void print_speed(void)
 static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
 {
     char bda_str[18] = {0};
-
+    ESP_LOGI(SPP_TAG, "esp_spp_cb ev: %d", event);
     switch (event) {
     case ESP_SPP_INIT_EVT:
         if (param->init.status == ESP_SPP_SUCCESS) {
@@ -85,6 +86,7 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
     case ESP_SPP_CLOSE_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_CLOSE_EVT status:%d handle:%"PRIu32" close_by_remote:%d", param->close.status,
                  param->close.handle, param->close.async);
+        bluetooth::onDisconnect();
         break;
     case ESP_SPP_START_EVT:
         if (param->start.status == ESP_SPP_SUCCESS) {
@@ -109,11 +111,11 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
          */
         ESP_LOGI(SPP_TAG, "ESP_SPP_DATA_IND_EVT len:%d handle:%lu",
                  param->data_ind.len, param->data_ind.handle);
-        if (param->data_ind.len < 128) {
-            esp_log_buffer_hex("", param->data_ind.data, param->data_ind.len);
-        }
+        //if (param->data_ind.len < 128) {
+        //    esp_log_buffer_hex("btr", param->data_ind.data, param->data_ind.len);
+        //}
 
-        esp_spp_write( param->data_ind.handle, sizeof("Response")-1, (uint8_t *)"Response") ;
+        bluetooth::onReceiveData(param->data_ind);
 #else
         gettimeofday(&time_new, NULL);
         data_num += param->data_ind.len;
@@ -127,13 +129,14 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
         break;
     case ESP_SPP_WRITE_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_WRITE_EVT status:%d, len:%d", param->write.status, param->write.len);
-        
-        //esp_log_buffer_hex("", spp_data, param->write.len);
+
+        //esp_log_buffer_hex("btw", spp_data, param->write.len);
         break;
     case ESP_SPP_SRV_OPEN_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_SRV_OPEN_EVT status:%d handle:%lu, rem_bda:[%s]", param->srv_open.status,
                 param->srv_open.handle, bda2str(param->srv_open.rem_bda, bda_str, sizeof(bda_str)));
         gettimeofday(&time_old, NULL);
+        bluetooth::onConnect();
         break;
     case ESP_SPP_SRV_STOP_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_SRV_STOP_EVT");
@@ -151,6 +154,7 @@ void esp_bt_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
 {
     char bda_str[18] = {0};
 
+    ESP_LOGI(SPP_TAG, "esp_bt_gap_cb ev: %d", event);
     switch (event) {
     case ESP_BT_GAP_AUTH_CMPL_EVT:{
         if (param->auth_cmpl.stat == ESP_BT_STATUS_SUCCESS) {

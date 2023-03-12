@@ -353,13 +353,19 @@ namespace spi{ //spi::ili9341
         t.base.rx_buffer = data;
         spi_device_transmit(dev->m_spi_dev, reinterpret_cast<spi_transaction_t*>(&t));
 
-        char* str = new char[count*2+1];
+        //char* str = new char[count*2+1];
+        //char* str = new char[32];
+        //char* str = (char*)malloc(count*2+1);
+        char str[100];
+        //]char* str = (char*)heap_caps_malloc(count*2+1, MALLOC_CAP_DEFAULT);
         for(int i = 0; i<count; i++)
         {
             sprintf(str+i*3, "%.2x,",data[i]);
         }
         ESP_LOGE(__FUNCTION__, " R[%.2x+%.2x]=%s", addr, count, str);
-        delete[] str;
+        //delete[] str;
+        //free(str);
+        //heap_caps_free(str);
         }
     }
 
@@ -450,9 +456,13 @@ namespace spi{ //spi::ili9341
             constexpr size_t length=8;//stack size =2kB
         for(;;)//for(int i=0;i<1000;i++)
         {
+            
+            
             memset(&data, 0, sizeof(data));
             ReadRegisters(this, 0x3B, (uint8_t*)data, 14/*ACCEL_XOUT_H*/);
-            
+            ESP_LOGI(__FUNCTION__, "mem free: %d, total: %d", heap_caps_get_free_size(MALLOC_CAP_DEFAULT), heap_caps_get_total_size(MALLOC_CAP_DEFAULT));
+            heap_caps_check_integrity(MALLOC_CAP_DEFAULT, true);
+
             //ReadRegisters:  R[3b+0e]=ff,80,00,6c,49,48,05,69,00,5e,00,ae,ff,f0,
 
             //std::string ax = std::to_string(0.01);
@@ -485,6 +495,7 @@ namespace spi{ //spi::ili9341
             std::string sry = float_to_str((ry/32768.0f), 2, 4);
             std::string srz = float_to_str((rz/32768.0f), 2, 4);
 
+
             ili9341_text_attr_t attr{};
             attr.font = &ili9341_font_16x26;
             attr.fg_color = RGB(255,0,0);
@@ -513,9 +524,9 @@ namespace spi{ //spi::ili9341
             attr.fg_color = RGB(255,255,255);
             attr.origin_y += attr.font->height;
             ili9341_draw_string(dev, attr, stemp);
-            
+           
             //usleep(150*1000);
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
         }
 
 
