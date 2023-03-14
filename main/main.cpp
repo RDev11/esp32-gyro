@@ -7,7 +7,6 @@
 //#include "text.h"
 //==============================================================
 #define TAG "main"
-#define DCRS_PIN  static_cast<gpio_num_t>(25)
 // 16 bits per pixel
 #define SPI_BYTESPERPIXEL 2
 //#include "img_doom_v.h"
@@ -21,9 +20,9 @@ using namespace spi;
 
 class MyMotor {
 public:
-	MyMotor() {
-		dir_gpio = GPIO_NUM_32;
-		step_gpio = (gpio_num_t)32;
+	MyMotor(gpio_num_t dir_pin, gpio_num_t step_pin, bool inverse_dir = false) {
+		dir_gpio = dir_pin;
+		step_gpio = step_pin;
 		_step = 0;
 		dir = 1;
 	}
@@ -49,7 +48,9 @@ public:
 	int _step;
 	int dir;
 };
-MyMotor myMotor;
+MyMotor myMotor1((gpio_num_t)CONFIG_PIN_NUM_MOT1_DIR, (gpio_num_t)CONFIG_PIN_NUM_MOT1_STEP);
+MyMotor myMotor2((gpio_num_t)CONFIG_PIN_NUM_MOT2_DIR, (gpio_num_t)CONFIG_PIN_NUM_MOT2_STEP);
+
 spi::Gyro dev2(HSPI_HOST, (gpio_num_t)26);
 
 
@@ -80,15 +81,18 @@ static bool example_timer_on_alarm_cb(gptimer_handle_t timer, const gptimer_alar
 	*/
 	//high_task_awoken = pdTRUE;
 	uint32_t delay = 65536*50 ;
-	myMotor.setDir(dev2.ax>0?1:0);
+	myMotor1.setDir(dev2.ax>0?1:0);
+	myMotor2.setDir(dev2.ax>0?1:0);
 	if (dev2.ax!=0){
 		delay = delay/std::abs(dev2.ax);
 	} 
 	if(delay>20000) {
 		delay = 20000;
-		myMotor.step();
+		myMotor1.step();
+		myMotor2.step();
 	} else {
-		myMotor.step();
+		myMotor1.step();
+		myMotor2.step();
 	}
 	delay = std::max(delay, (uint32_t)10);
 	//ESP_DRAM_LOGI(__FUNCTION__, "ON TIMER %d %d", delay, edata->alarm_value);
@@ -127,19 +131,21 @@ void app_main(void)
 {
 	app_main_cpp();
 }
+
 void app_main_cpp(void)
 {
 	ESP_LOGI(TAG, "BEGIN");
 	gpio_num_t led_gpio = (gpio_num_t)CONFIG_BLINK_GPIO;
 	gpio_num_t button_gpio = (gpio_num_t)CONFIG_BUTTON_GPIO;
+	gpio_num_t dcrs_gpio = (gpio_num_t)CONFIG_PIN_NUM_DCRS;
 	{//
 	  gpio_reset_pin(led_gpio);
 	  gpio_reset_pin(button_gpio);
-	  gpio_reset_pin(DCRS_PIN);
+	  gpio_reset_pin(dcrs_gpio);
 	  gpio_set_direction(led_gpio, GPIO_MODE_OUTPUT);
 	  gpio_set_direction(button_gpio, GPIO_MODE_INPUT);
 	  gpio_set_pull_mode(button_gpio, GPIO_PULLUP_ONLY);
-	  gpio_set_direction(DCRS_PIN, GPIO_MODE_OUTPUT);
+	  gpio_set_direction(dcrs_gpio, GPIO_MODE_OUTPUT);
 	  gpio_set_level(led_gpio, 1);
 	}
 	
@@ -158,7 +164,8 @@ void app_main_cpp(void)
 		.on_alarm = example_timer_on_alarm_cb, // register user callback
 	};
 	ESP_ERROR_CHECK(gptimer_register_event_callbacks(gptimer, &cbs, nullptr));
-	myMotor.init();
+	myMotor1.init();
+	myMotor2.init();
 	ESP_ERROR_CHECK(gptimer_enable(gptimer));
 	ESP_ERROR_CHECK(gptimer_start(gptimer));
 
@@ -178,12 +185,13 @@ void app_main_cpp(void)
 	ret = spi_bus_initialize(HSPI_HOST, &cfg, 1);*/
 
     spi::default_init(HSPI_HOST);
-	spi::ili9341 dev(HSPI_HOST, (gpio_num_t)CONFIG_PIN_NUM_CS, (gpio_num_t)DCRS_PIN);//display device
 
-	//spi::Gyro dev2(HSPI_HOST, (gpio_num_t)26);//accelerometer/gyroscope
+	ESP_LOGI(TAG, "after init display");
+
+	//spi::Gyro dev2(HSPI_HOST, (gpio_num_t)CONFIG_PIN_NUM_CS_GYRO);//accelerometer/gyroscope
 	{
 		memset(&dev2.m_spi_cfg, 0, sizeof(dev2.m_spi_cfg));
-		dev2.m_spi_cfg.spics_io_num = 26;
+		dev2.m_spi_cfg.spics_io_num = (gpio_num_t)CONFIG_PIN_NUM_CS_GYRO;
 		dev2.m_spi_cfg.clock_speed_hz = SPI_MASTER_FREQ_10M;//CLOCK_SPEED_HZ;
 		dev2.m_spi_cfg.mode = 3;
 		dev2.m_spi_cfg.queue_size = 1;
@@ -191,9 +199,11 @@ void app_main_cpp(void)
 		//dev2.spi_cfg.address_bits =
 		spi_bus_add_device(HSPI_HOST, &dev2.m_spi_cfg, &dev2.m_spi_dev);
 	}
-	
-	ESP_LOGI(TAG, "after init display");
 
+	bluetooth::bluetooth_start_accept();
+#define USE_DISPLAY true
+#if(USE_DISPLAY)
+	spi::ili9341 dev(HSPI_HOST, (gpio_num_t)CONFIG_PIN_NUM_CS_DISPLAY, dcrs_gpio);//display device
 	swapbytes((uint8_t*)img_doom, sizeof(img_doom));
 	vTaskDelay(1);
 	bool bImg=false;
@@ -206,9 +216,11 @@ void app_main_cpp(void)
 	dev.ClearScreen();
 	vTaskDelay(1);
 	//bt_test();
-	bluetooth::bluetooth_start_accept();
 	
 	dev2.testGyro(&dev);
+#else
+	dev2.testGyro(nullptr);
+#endif
 	color=random();
   while (1) {
     if(gpio_get_level(button_gpio)) //кнопка НЕ нажата
@@ -226,7 +238,7 @@ void app_main_cpp(void)
     		//DrawDoomImg(&dev);
     	else
     		ClearScreen(&dev);*/
-    	bImg=!bImg;
+    	//bImg=!bImg;
     	}
     vTaskDelay(10 / portTICK_PERIOD_MS);
   }

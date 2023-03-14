@@ -39,11 +39,52 @@ menu "Example Configuration"
         help
             SCLK: SCK, CLK, SPC (SPI serial port clock) pin.
 
-    config PIN_NUM_CS
+    config PIN_NUM_CS_DISPLAY
         int "CS pin"
         range 0 48
         default 5
         help
-            CS (SS) pin.
+            CS (SS,NCS) pin. - Chip Select
 
+    config PIN_NUM_DCRS
+        int "DC/RS pin"
+        range 0 48
+        default 14
+        help
+            Display DC/RS pin.
+
+    config PIN_NUM_CS_GYRO
+        int "CS pin"
+        range 0 48
+        default 25
+        help
+            CS (SS,NCS) pin. - Chip Select
+
+    config PIN_NUM_MOT1_DIR
+        int "PIN_NUM_MOT1_DIR"
+        range 0 48
+        default 26
+        help
+            PIN_NUM_MOT1_DIR.
+
+    config PIN_NUM_MOT1_STEP
+        int "PIN_NUM_MOT1_STEP"
+        range 0 48
+        default 27
+        help
+            Display DC/RS pin.
+
+    config PIN_NUM_MOT2_DIR
+        int "PIN_NUM_MOT2_DIR"
+        range 0 48
+        default 32
+        help
+            PIN_NUM_MOT2_DIR.
+
+    config PIN_NUM_MOT2_STEP
+        int "PIN_NUM_MOT2_STEP"
+        range 0 48
+        default 33
+        help
+            PIN_NUM_MOT2_STEP.
 endmenu
