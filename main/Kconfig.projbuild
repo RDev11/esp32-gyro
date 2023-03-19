@@ -23,14 +23,14 @@ menu "Example Configuration"
         range 0 48
         default 23
         help
-            MOSI (SDI) pin.
+            MOSI (SDI) pin. Master Output Slave Input
 
     config PIN_NUM_MISO
         int "MISO pin"
         range 0 48
         default 19
         help
-            MISO (SDO) pin.
+            MISO (SDO) pin. Master Input Slave Output
 
     config PIN_NUM_CLK
         int "CLK pin"
@@ -63,28 +63,28 @@ menu "Example Configuration"
     config PIN_NUM_MOT1_DIR
         int "PIN_NUM_MOT1_DIR"
         range 0 48
-        default 26
+        default 27
         help
             PIN_NUM_MOT1_DIR.
 
     config PIN_NUM_MOT1_STEP
         int "PIN_NUM_MOT1_STEP"
         range 0 48
-        default 27
+        default 26
         help
             Display DC/RS pin.
 
     config PIN_NUM_MOT2_DIR
         int "PIN_NUM_MOT2_DIR"
         range 0 48
-        default 32
+        default 33
         help
             PIN_NUM_MOT2_DIR.
 
     config PIN_NUM_MOT2_STEP
         int "PIN_NUM_MOT2_STEP"
         range 0 48
-        default 33
+        default 32
         help
             PIN_NUM_MOT2_STEP.
 endmenu

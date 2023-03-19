@@ -67,7 +67,7 @@ static void print_speed(void)
 static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
 {
     char bda_str[18] = {0};
-    ESP_LOGI(SPP_TAG, "esp_spp_cb ev: %d", event);
+//    ESP_LOGI(SPP_TAG, "esp_spp_cb ev: %d", event);
     switch (event) {
     case ESP_SPP_INIT_EVT:
         if (param->init.status == ESP_SPP_SUCCESS) {
@@ -86,7 +86,7 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
     case ESP_SPP_CLOSE_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_CLOSE_EVT status:%d handle:%"PRIu32" close_by_remote:%d", param->close.status,
                  param->close.handle, param->close.async);
-        bluetooth::onDisconnect();
+        bluetooth::onDisconnect(param->close);
         break;
     case ESP_SPP_START_EVT:
         if (param->start.status == ESP_SPP_SUCCESS) {
@@ -128,7 +128,7 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
         ESP_LOGI(SPP_TAG, "ESP_SPP_CONG_EVT");
         break;
     case ESP_SPP_WRITE_EVT:
-        ESP_LOGI(SPP_TAG, "ESP_SPP_WRITE_EVT status:%d, len:%d", param->write.status, param->write.len);
+//        ESP_LOGI(SPP_TAG, "ESP_SPP_WRITE_EVT status:%d, len:%d", param->write.status, param->write.len);
 
         //esp_log_buffer_hex("btw", spp_data, param->write.len);
         break;
@@ -136,7 +136,7 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
         ESP_LOGI(SPP_TAG, "ESP_SPP_SRV_OPEN_EVT status:%d handle:%lu, rem_bda:[%s]", param->srv_open.status,
                 param->srv_open.handle, bda2str(param->srv_open.rem_bda, bda_str, sizeof(bda_str)));
         gettimeofday(&time_old, NULL);
-        bluetooth::onConnect();
+        bluetooth::onConnect(param->srv_open);
         break;
     case ESP_SPP_SRV_STOP_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_SRV_STOP_EVT");

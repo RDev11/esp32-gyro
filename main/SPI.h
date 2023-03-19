@@ -111,6 +111,28 @@ namespace spi
         int16_t ax, ay, az;
         int16_t rx, ry, rz;
         int16_t temp;
+        
+        
+        struct Balancing{
+            uint32_t timestamp;
+            float xangle;//
+            float xangle_rot;//
+            float xangle_acc;//
+            float P;//
+            float I;
+            float D;
+            float K;//коэффицент комплиментарного фильтра, угол вычисляется: 0.0 - по аккселерометру .. 1.0 -по гироскопу
+            float angle_offset;
+            float Ep=0;
+            float Ei=0;
+            float Ed=0;
+            float Elast=0;
+            int16_t delay1;
+            int16_t delay2;
+            float speed=0;
+            int64_t steps;
+            uint8_t state;
+        } bal;
     };
 
 

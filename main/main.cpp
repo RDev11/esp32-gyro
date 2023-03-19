@@ -25,6 +25,7 @@ public:
 		step_gpio = step_pin;
 		_step = 0;
 		dir = 1;
+		this->inverse_dir = inverse_dir;
 	}
 	void init() {
 		
@@ -40,16 +41,17 @@ public:
 	}
 	void setDir(int dir){
 		this->dir = dir;
-		gpio_set_level(dir_gpio, dir);
+		gpio_set_level(dir_gpio, (inverse_dir ? 1-dir : dir));
 	}
 public:
 	gpio_num_t dir_gpio;
 	gpio_num_t step_gpio;
 	int _step;
 	int dir;
+	bool inverse_dir;
 };
 MyMotor myMotor1((gpio_num_t)CONFIG_PIN_NUM_MOT1_DIR, (gpio_num_t)CONFIG_PIN_NUM_MOT1_STEP);
-MyMotor myMotor2((gpio_num_t)CONFIG_PIN_NUM_MOT2_DIR, (gpio_num_t)CONFIG_PIN_NUM_MOT2_STEP);
+MyMotor myMotor2((gpio_num_t)CONFIG_PIN_NUM_MOT2_DIR, (gpio_num_t)CONFIG_PIN_NUM_MOT2_STEP, true);
 
 spi::Gyro dev2(HSPI_HOST, (gpio_num_t)26);
 
@@ -80,24 +82,18 @@ static bool example_timer_on_alarm_cb(gptimer_handle_t timer, const gptimer_alar
     	xQueueSendFromISR(queue, &ele, &high_task_awoken);
 	*/
 	//high_task_awoken = pdTRUE;
-	uint32_t delay = 65536*50 ;
-	myMotor1.setDir(dev2.ax>0?1:0);
-	myMotor2.setDir(dev2.ax>0?1:0);
-	if (dev2.ax!=0){
-		delay = delay/std::abs(dev2.ax);
-	} 
-	if(delay>20000) {
-		delay = 20000;
+	
+	myMotor1.setDir(dev2.bal.delay1>0?1:0);
+	myMotor2.setDir(dev2.bal.delay1>0?1:0);
+	if(dev2.bal.delay1!=10000)
+	{
 		myMotor1.step();
 		myMotor2.step();
-	} else {
-		myMotor1.step();
-		myMotor2.step();
+		dev2.bal.steps += dev2.bal.delay1>0?1:-1;
 	}
-	delay = std::max(delay, (uint32_t)10);
 	//ESP_DRAM_LOGI(__FUNCTION__, "ON TIMER %d %d", delay, edata->alarm_value);
     gptimer_alarm_config_t alarm_config = {
-        .alarm_count = edata->alarm_value + delay, 
+        .alarm_count = edata->alarm_value + std::max(std::abs(dev2.bal.delay1), 20), 
     };
     gptimer_set_alarm_action(timer, &alarm_config);
     // return whether we need to yield at the end of ISR
@@ -201,7 +197,7 @@ void app_main_cpp(void)
 	}
 
 	bluetooth::bluetooth_start_accept();
-#define USE_DISPLAY true
+#define USE_DISPLAY false
 #if(USE_DISPLAY)
 	spi::ili9341 dev(HSPI_HOST, (gpio_num_t)CONFIG_PIN_NUM_CS_DISPLAY, dcrs_gpio);//display device
 	swapbytes((uint8_t*)img_doom, sizeof(img_doom));

@@ -20,7 +20,7 @@
 //#define min(a,b) ((a)<(b)?(a):(b)) //min,max объявляются в <string>
 //#define max(a,b) ((a)>(b)?(a):(b))
 
-inline void swapbytes (uint8_t* buf, uint32_t size)//
+inline void swapbytes2 (uint8_t* buf, uint32_t size)//
 {
 	ESP_LOGI(__FUNCTION__, "IN");
 	uint8_t t;
@@ -32,6 +32,18 @@ inline void swapbytes (uint8_t* buf, uint32_t size)//
 	}
 	ESP_LOGI(__FUNCTION__, "OUT");
 }
+
+inline void swapbytes(uint8_t* buf, uint32_t size)//
+{
+	uint8_t t;
+	for(uint32_t i=0;i<size/2;i+=1)//SPI_SWAP_DATA_TX can help
+	{
+		t = buf[i];
+		buf[i] = buf[size-i-1];
+		buf[size-i-1] = t;
+	}
+}
+
 inline uint16_t swapbytes (const uint16_t& v)//
 {
 	return (v>>8) | (v<<8);
@@ -48,6 +60,14 @@ inline uint16_t RGB(uint8_t r, uint8_t g, uint8_t b)//3 байта сжимае�
 inline uint16_t RGB(uint32_t rgb)//3 байта сжимает в 2
 {
 	return swapbytes((rgb>>16 & 0xF8)<<8 | (rgb>>8 & 0xFC)<<3 | (rgb&0xF8)>>3);
+}
+
+inline float clamp(float v, float vmin, float vmax){
+	if(v<vmin)
+		return vmin;
+	if(v>vmax)
+		return vmax;
+	return v;
 }
 
 //workaround, to_string(float) и подобные функции по какой-то причине выдают ошибку
