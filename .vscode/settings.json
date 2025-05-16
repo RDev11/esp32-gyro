@@ -94,5 +94,6 @@
         "xutility": "cpp"
     },
     "idf.notificationSilentMode": false,
-    "idf.flashType": "UART"
+    "idf.flashType": "UART",
+    "idf.portWin": "COM3"
 }

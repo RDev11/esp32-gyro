@@ -6,17 +6,25 @@
 //#include "ili9341_d.h"
 //#include "text.h"
 //==============================================================
-#define TAG "main"
+#define TAG_LOG "main"
 // 16 bits per pixel
 #define SPI_BYTESPERPIXEL 2
 //#include "img_doom_v.h"
 uint16_t img_doom[]={0};
 //
-#include "bluetooth/bluetooth_serial.h"
-
-uint16_t color=0;
-using namespace spi;
-
+//#include "bluetooth/bluetooth_serial.h"
+#include "wifi.h"
+///
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "nvs_flash.h"
+///
+//using namespace spi;
 
 class MyMotor {
 public:
@@ -27,18 +35,20 @@ public:
 		dir = 1;
 		this->inverse_dir = inverse_dir;
 	}
+
 	void init() {
-		
 		gpio_reset_pin(dir_gpio);
 		gpio_reset_pin(step_gpio);
 		gpio_set_direction(dir_gpio, GPIO_MODE_OUTPUT);
 		gpio_set_direction(step_gpio, GPIO_MODE_OUTPUT);
 		gpio_set_level(dir_gpio, dir);
 	}
+
 	void step() {
 		_step = 1 - _step;
 		gpio_set_level(step_gpio, _step);
 	}
+
 	void setDir(int dir){
 		this->dir = dir;
 		gpio_set_level(dir_gpio, (inverse_dir ? 1-dir : dir));
@@ -55,22 +65,15 @@ MyMotor myMotor2((gpio_num_t)CONFIG_PIN_NUM_MOT2_DIR, (gpio_num_t)CONFIG_PIN_NUM
 
 spi::Gyro dev2(HSPI_HOST, (gpio_num_t)26);
 
-
-gptimer_alarm_config_t alarm_config = {
-    .alarm_count = 1000000, // period = 1s @resolution 1MHz
-  //  .reload_count = 0, // counter will reload with 0 on alarm event
-  //  .flags = {.auto_reload_on_alarm=true}, // enable auto-reload
-};
-
-
-typedef struct {
-    uint64_t event_count;
-} example_queue_element_t;
-
 static bool example_timer_on_alarm_cb(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx)
 {
     BaseType_t high_task_awoken = pdFALSE;
-	/*	QueueHandle_t queue = (QueueHandle_t)user_ctx;
+	/*	
+		typedef struct {
+			uint64_t event_count;
+		} example_queue_element_t;
+
+	    QueueHandle_t queue = (QueueHandle_t)user_ctx;
 		// Retrieve the count value from event data
 		example_queue_element_t ele = {
 			.event_count = edata->count_value
@@ -100,52 +103,14 @@ static bool example_timer_on_alarm_cb(gptimer_handle_t timer, const gptimer_alar
     return high_task_awoken == pdTRUE;
 }
 
+gptimer_alarm_config_t alarm_config = {
+    .alarm_count = 1000000, // period = 1s @resolution 1MHz
+  //  .reload_count = 0, // counter will reload with 0 on alarm event
+  //  .flags = {.auto_reload_on_alarm=true}, // enable auto-reload
+};
 
-
-
-void DrawDoomImg(ili9341* dev, uint8_t* img_doom, size_t size)
-{
-    ESP_LOGI(__FUNCTION__, "IN");
-    
-    //setWindow(dev, 0, DISPLAY_NATIVE_WIDTH-1, 0, DISPLAY_NATIVE_WIDTH-1);
-    
-    //dev->transfer(img_doom, size);
-    for(size_t i = 0; i < size; i+=4092)
-    {
-        //gpio_set_level(m_dcrs_pin, 1);
-        dev->transfer(&img_doom[i], std::min((size_t)4092, size-i));
-        //vTaskDelay(1);
-    }
-    ESP_LOGI(__FUNCTION__, "OUT");
-}
-
-void app_main_cpp(void);
-extern "C"{
-    void app_main(void);
-}
-void app_main(void)
-{
-	app_main_cpp();
-}
-
-void app_main_cpp(void)
-{
-	ESP_LOGI(TAG, "BEGIN");
-	gpio_num_t led_gpio = (gpio_num_t)CONFIG_BLINK_GPIO;
-	gpio_num_t button_gpio = (gpio_num_t)CONFIG_BUTTON_GPIO;
-	gpio_num_t dcrs_gpio = (gpio_num_t)CONFIG_PIN_NUM_DCRS;
-	{//
-	  gpio_reset_pin(led_gpio);
-	  gpio_reset_pin(button_gpio);
-	  gpio_reset_pin(dcrs_gpio);
-	  gpio_set_direction(led_gpio, GPIO_MODE_OUTPUT);
-	  gpio_set_direction(button_gpio, GPIO_MODE_INPUT);
-	  gpio_set_pull_mode(button_gpio, GPIO_PULLUP_ONLY);
-	  gpio_set_direction(dcrs_gpio, GPIO_MODE_OUTPUT);
-	  gpio_set_level(led_gpio, 1);
-	}
-	
-
+//моторы управляются через dev2.bal
+void init_motors() {
 	gptimer_handle_t gptimer = NULL;
 	gptimer_config_t timer_config = {
 		.clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -164,25 +129,89 @@ void app_main_cpp(void)
 	myMotor2.init();
 	ESP_ERROR_CHECK(gptimer_enable(gptimer));
 	ESP_ERROR_CHECK(gptimer_start(gptimer));
+}
 
-	ESP_LOGI(TAG, "after timers");
-	//ESP_LOGI(TAG, "test float=%2.4f", 0.4);
-	/*esp_err_t ret=ESP_OK;
-	spi_bus_config_t cfg={
-			.mosi_io_num=CONFIG_PIN_NUM_MOSI,
-			.miso_io_num=CONFIG_PIN_NUM_MISO,
-			.sclk_io_num=CONFIG_PIN_NUM_CLK,
-			.quadwp_io_num = -1,
-			.quadhd_io_num = -1,
-			.max_transfer_sz = 0,
-			.flags = 0
-	};
 
-	ret = spi_bus_initialize(HSPI_HOST, &cfg, 1);*/
+
+
+void app_main_cpp(void);
+extern "C"{
+    void app_main(void);
+}
+void app_main(void)
+{
+	app_main_cpp();
+}
+
+void app_main_cpp(void)
+{
+	ESP_LOGI(TAG_LOG, "BEGIN");
+    // Инициализация NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+    
+	dev2.bal.P = 10;
+	dev2.bal.I = 60;
+	dev2.bal.D = 0.03;
+	dev2.bal.angle_offset = 0.00;
+	dev2.bal.K=0.99;
+/*
+#include "nvs_flash.h"
+#include "nvs.h"
+
+// Инициализация NVS
+esp_err_t ret = nvs_flash_init();
+if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+	ESP_ERROR_CHECK(nvs_flash_erase());
+	ret = nvs_flash_init();
+}
+ESP_ERROR_CHECK(ret);
+// Запись
+nvs_handle_t handle;
+nvs_open("storage", NVS_READWRITE, &handle);
+nvs_set_i32(handle, "boot_count", 123);  // Сохраняем число
+nvs_commit(handle);  // Фиксируем изменения
+nvs_close(handle);
+
+// Чтение
+int32_t boot_count = 0;
+nvs_open("storage", NVS_READONLY, &handle);
+nvs_get_i32(handle, "boot_count", &boot_count);
+nvs_close(handle);
+*/
+
+    ESP_LOGI(TAG_LOG, "Initializing WiFi");
+    gWifi().init_sta();
+
+
+	gpio_num_t led_gpio = (gpio_num_t)CONFIG_BLINK_GPIO;
+	gpio_num_t button_gpio = (gpio_num_t)CONFIG_BUTTON_GPIO;
+	gpio_num_t dcrs_gpio = (gpio_num_t)CONFIG_PIN_NUM_DCRS;
+	{//
+	  gpio_reset_pin(led_gpio);
+	  gpio_reset_pin(button_gpio);
+	  gpio_reset_pin(dcrs_gpio);
+	  gpio_set_direction(led_gpio, GPIO_MODE_OUTPUT);
+	  gpio_set_direction(button_gpio, GPIO_MODE_INPUT);
+	  gpio_set_pull_mode(button_gpio, GPIO_PULLUP_ONLY);
+	  gpio_set_direction(dcrs_gpio, GPIO_MODE_OUTPUT);
+	  gpio_set_level(led_gpio, 1);
+	}
+	
+
+	init_motors();
+
+	ESP_LOGI(TAG_LOG, "after timers");
+	//ESP_LOGI(TAG_LOG, "test float=%2.4f", 0.4);
+
 
     spi::default_init(HSPI_HOST);
 
-	ESP_LOGI(TAG, "after init display");
+	ESP_LOGI(TAG_LOG, "after init display");
 
 	//spi::Gyro dev2(HSPI_HOST, (gpio_num_t)CONFIG_PIN_NUM_CS_GYRO);//accelerometer/gyroscope
 	{
@@ -196,47 +225,22 @@ void app_main_cpp(void)
 		spi_bus_add_device(HSPI_HOST, &dev2.m_spi_cfg, &dev2.m_spi_dev);
 	}
 
-	bluetooth::bluetooth_start_accept();
-#define USE_DISPLAY false
-#if(USE_DISPLAY)
-	spi::ili9341 dev(HSPI_HOST, (gpio_num_t)CONFIG_PIN_NUM_CS_DISPLAY, dcrs_gpio);//display device
-	swapbytes((uint8_t*)img_doom, sizeof(img_doom));
-	vTaskDelay(1);
-	bool bImg=false;
-	dev.setWindowFullScreen();
-	DrawDoomImg(&dev, (uint8_t*)img_doom, sizeof(img_doom));
-	//dev.setWindowFullScreen();
-	//DrawDoomImg(&dev, ((uint8_t*)img_doom)+sizeof(img_doom)/2, sizeof(img_doom)/2);
-	
-	vTaskDelay(1);
-	dev.ClearScreen();
-	vTaskDelay(1);
-	//bt_test();
-	
-	dev2.testGyro(&dev);
-#else
+	//bluetooth::bluetooth_start_accept();
+
 	dev2.testGyro(nullptr);
-#endif
-	color=random();
-  while (1) {
-    if(gpio_get_level(button_gpio)) //кнопка НЕ нажата
-	{
-		gpio_set_level(led_gpio, 0);
-		
-    	ESP_LOGI(__FUNCTION__, ".");
-	}
-    else
-    	{
-    	gpio_set_level(led_gpio, 1);
-    	color=random();
-    	/*if(bImg)
-			DrawDoomImg(&dev, (uint8_t*)img_doom, sizeof(img_doom));
-    		//DrawDoomImg(&dev);
-    	else
-    		ClearScreen(&dev);*/
-    	//bImg=!bImg;
-    	}
-    vTaskDelay(10 / portTICK_PERIOD_MS);
-  }
+	/*
+	while (1) {
+		if(gpio_get_level(button_gpio)) //кнопка НЕ нажата
+		{
+			gpio_set_level(led_gpio, 0);
+			
+			ESP_LOGI(__FUNCTION__, ".");
+		}
+		else
+			{
+			gpio_set_level(led_gpio, 1);
+			}
+		vTaskDelay(10 / portTICK_PERIOD_MS);
+	}*/
 }
 
